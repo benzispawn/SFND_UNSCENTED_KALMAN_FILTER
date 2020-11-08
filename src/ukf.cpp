@@ -14,7 +14,7 @@ UKF::UKF() {
   use_laser_ = false;
 
   // if this is false, radar measurements will be ignored (except during init)
-  use_radar_ = false;
+  use_radar_ = true;
 
   // Dimensions
   n_x_ = 5;
@@ -323,7 +323,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   mea_cov_ += lidar_noise_m_; 
  
-  UKF::UpdateState(mea_, 2);
+  UpdateState(mea_, 2);
 
 }
 
@@ -334,6 +334,64 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
    * covariance, P_.
    * You can also calculate the radar NIS, if desired.
    */
+  int n_z = 3;
+
+  // MEASUREMENT COVARIANCE MATRIX
+  mea_cov_ = Eigen::MatrixXd(n_z, n_z);
+
+  // SIGMA POINT IN THE MEASUREMENT SPACE
+  mea_sig_ = Eigen::MatrixXd(n_z, size_);
+  // PREDICTION MEASUREMENT
+  mean_mea_ = Eigen::VectorXd(n_z);
+
+  mea_ = meas_package.raw_measurements_;
+
+
+  mea_sig_.fill(0.0);
+  mean_mea_.fill(0.0);
+  mea_cov_.fill(0.0);
+
+  for (int i = 0; i < size_; ++i)
+  {
+    double _p_x = Xsig_pred_(0, i);
+    double _p_y = Xsig_pred_(1, i);
+    double _p_v = Xsig_pred_(2, i);
+    double _p_yaw = Xsig_pred_(3, i);
+
+    double _p_v1 = std::cos(_p_yaw) * _p_v;
+    double _p_v2 = std::sin(_p_yaw) * _p_v;
+
+    mea_sig_(0, i) = sqrt(_p_x * _p_x + _p_y * _p_y);
+    mea_sig_(1, i) = atan2(_p_y, _p_x);
+    if (_p_y != 0 || _p_x != 0)
+    {
+      mea_sig_(2, i) = (_p_x * _p_v1 + _p_y * _p_v2) / mea_sig_(0, i);
+    } else 
+    {
+      mea_sig_(2, i) = 0;
+    }
+  }
+
+  for (int i = 0; i < size_; ++i)
+  {
+    mean_mea_ += mea_sig_.col(i) * weights_(i);
+  }
+
+  for (int i = 0; i < size_; ++i)
+  {
+    Eigen::VectorXd _diff = mea_sig_.col(i) - mean_mea_;
+
+    while (_diff(1) > M_PI) _diff(1) -= 2.*M_PI;
+    while (_diff(1) < -M_PI) _diff(1) += 2.*M_PI;
+
+    mea_cov_ += weights_(i) * _diff * _diff.transpose();
+  }
+
+  mea_cov_ += radar_noise_m_;
+
+   
+
+  UpdateState(mea_, n_z);
 }
 
 void UKF::UpdateState(const Eigen::VectorXd z, int n_z_) {
