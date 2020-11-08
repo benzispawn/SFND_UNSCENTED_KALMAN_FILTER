@@ -389,8 +389,6 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   mea_cov_ += radar_noise_m_;
 
-   
-
   UpdateState(mea_, n_z);
 }
 
