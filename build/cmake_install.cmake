@@ -1,4 +1,4 @@
-# Install script for directory: /home/raphael/Documents/SFND_Unscented_Kalman_Filter
+# Install script for directory: /home/raphael/Documents/repositories/SFND_UNSCENTED_KALMAN_FILTER
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -45,5 +45,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/raphael/Documents/SFND_Unscented_Kalman_Filter/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/raphael/Documents/repositories/SFND_UNSCENTED_KALMAN_FILTER/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

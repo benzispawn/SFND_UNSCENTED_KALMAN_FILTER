@@ -11,7 +11,7 @@
  */
 UKF::UKF() {
   // if this is false, laser measurements will be ignored (except during init)
-  use_laser_ = false;
+  use_laser_ = true;
 
   // if this is false, radar measurements will be ignored (except during init)
   use_radar_ = true;
@@ -25,17 +25,22 @@ UKF::UKF() {
   // initial covariance matrix
   P_ = Eigen::MatrixXd(n_x_, n_x_);
 
-  P_ << std_laspx_ * std_laspx_, 0, 0, 0, 0,
-        0, std_laspy_ * std_laspy_, 0, 0, 0,
+  // P_ << std_laspx_ * std_laspx_, 0, 0, 0, 0,
+  //       0, std_laspy_ * std_laspy_, 0, 0, 0,
+  //       0, 0, 1, 0, 0,
+  //       0, 0, 0, 1, 0,
+  //       0, 0, 0, 0, 1;
+  P_ << 1, 0, 0, 0, 0,
+        0, 1, 0, 0, 0,
         0, 0, 1, 0, 0,
-        0, 0, 0, 1, 0,
-        0, 0, 0, 0, 1;
+        0, 0, 0, .0225, 0,
+        0, 0, 0, 0, .0225;
 
   // Augmented dimension
   n_aug_ = n_x_ + 2;
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 1.0;//30;
+  std_a_ = 10.0;//30;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
   std_yawdd_ = .8;//30;
@@ -109,11 +114,11 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
                                             0, 
                                             0, 
                                           0.0;
-      P_ << std_laspx_ * std_laspx_, 0, 0, 0, 0,
-            0, std_laspy_ * std_laspy_, 0, 0, 0,
-            0, 0, 1, 0, 0,
-            0, 0, 0, 1, 0,
-            0, 0, 0, 0, 1;
+      // P_ << std_laspx_ * std_laspx_, 0, 0, 0, 0,
+      //       0, std_laspy_ * std_laspy_, 0, 0, 0,
+      //       0, 0, 1, 0, 0,
+      //       0, 0, 0, 1, 0,
+      //       0, 0, 0, 0, 1;
                                         
     } else {
       // COORDINATE TRANSFORMATION POLAR TO RECT
@@ -127,19 +132,19 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       double v = std::sqrt(vx * vx + vy * vy);
       x_ << x, y, v, rho, rho_dot;
 
-      P_ << std_radr_ * std_radr_, 0, 0, 0, 0,
-        0, std_radr_ * std_radr_, 0, 0, 0,
-        0, 0, std_radrd_ * std_radrd_, 0, 0,
-        0, 0, 0, std_radphi_, 0,
-        0, 0, 0, 0, std_radphi_;
+      // P_ << std_radr_ * std_radr_, 0, 0, 0, 0,
+      //   0, std_radr_ * std_radr_, 0, 0, 0,
+      //   0, 0, std_radrd_ * std_radrd_, 0, 0,
+      //   0, 0, 0, std_radphi_, 0,
+      //   0, 0, 0, 0, std_radphi_;
     }
     is_initialized_ = true;
     return;
   }
   //std::cout << meas_package.raw_measurements_ << std::endl;
 
-  float dt = (meas_package.timestamp_ - time_us_) / 1000000.0;
-  //float dt = static_cast<double>((meas_package.timestamp_ - time_us_) * 1e-6);
+  //float dt = (meas_package.timestamp_ - time_us_) / 1000000.0;
+  float dt = static_cast<double>((meas_package.timestamp_ - time_us_) * 1e-6);
   time_us_ = meas_package.timestamp_;
 
   while (dt > 0.1)
@@ -226,6 +231,9 @@ void UKF::SigmaPointsPred(Eigen::MatrixXd& Xsig_aug, double delta_t)
     p_y += 0.5 * _noise * delta_t * delta_t * std::sin(_yaw);
     v_p += _noise * delta_t;
 
+    yaw_p += 0.5 * _noise_yaw * delta_t * delta_t; 
+    yawd_p += _noise_yaw * delta_t;
+
     // ADDING SOME NOISE
     Xsig_pred_(0, i) = p_x;//p_x + 0.5 * _noise * delta_t * delta_t * std::cos(_yaw);
     Xsig_pred_(1, i) = p_y;//p_y + 0.5 * _noise * delta_t * delta_t * std::sin(_yaw); 
@@ -266,7 +274,7 @@ void UKF::Prediction(double delta_t) {
   {
     Eigen::VectorXd x_diff = Xsig_pred_.col(i) - x_;
     //NORMALIZATION
-    std::cout << M_PI << std::endl;
+    // std::cout << M_PI << std::endl;
     std::cout << x_diff(3) << std::endl;
     while(x_diff(3) > M_PI) x_diff(3) -= 2.*M_PI;
     while(x_diff(3) < -M_PI) x_diff(3) += 2.*M_PI;
@@ -293,6 +301,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   // SIGMA POINT IN THE MEASUREMENT SPACE
   mea_sig_ = Eigen::MatrixXd(n_z, size_);
+  mea_sig_.fill(0.0);
   // PREDICTION MEASUREMENT
   mean_mea_ = Eigen::VectorXd(n_z);
 
@@ -316,8 +325,8 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
     //Eigen::VectorXd mea_diff_ = H_ * mea_sig_.col(i) - mean_mea_;
     Eigen::VectorXd mea_diff_ = mea_sig_.col(i) - mean_mea_;
     // ANGLE NORMALIZATION
-    while(mea_diff_(1) > M_PI) mea_diff_(1) -= 2. * M_PI;
-    while(mea_diff_(1) < -M_PI) mea_diff_(1) += 2. * M_PI; 
+    // while(mea_diff_(1) > M_PI) mea_diff_(1) -= 2. * M_PI;
+    // while(mea_diff_(1) < -M_PI) mea_diff_(1) += 2. * M_PI; 
     mea_cov_ += weights_(i) * mea_diff_ * mea_diff_.transpose();
   }
 
