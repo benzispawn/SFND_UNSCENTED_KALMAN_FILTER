@@ -11,10 +11,10 @@
  */
 UKF::UKF() {
   // if this is false, laser measurements will be ignored (except during init)
-  use_laser_ = true;
+  use_laser_ = false;
 
   // if this is false, radar measurements will be ignored (except during init)
-  use_radar_ = true;
+  use_radar_ = false;
 
   // Dimensions
   n_x_ = 5;
@@ -80,6 +80,14 @@ UKF::UKF() {
 
   weights_ = Eigen::VectorXd(size_);
 
+  // AJUST VALUE ON weights_
+  double weight = 0.5/(lambda_+n_aug_);
+  weights_(0) = lambda_ / (lambda_+n_aug_);
+
+  for (int i = 1; i < size_; ++i) {
+      weights_(i) = weight;
+  } 
+
   // GENERATE SOME VETOR AND MATRIX's
   x_aug = Eigen::VectorXd(n_aug_);
   P_aug = Eigen::MatrixXd(n_aug_, n_aug_);
@@ -130,7 +138,8 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       double vx = rho_dot * std::cos(phi);
       double vy = rho_dot * std::sin(phi);
       double v = std::sqrt(vx * vx + vy * vy);
-      x_ << x, y, v, rho, rho_dot;
+      // x_ << x, y, v, rho, rho_dot;
+      x_ << x, y, v, 0, 0;
 
       // P_ << std_radr_ * std_radr_, 0, 0, 0, 0,
       //   0, std_radr_ * std_radr_, 0, 0, 0,
@@ -169,7 +178,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 
 void UKF::GenAugSigmaPoints(Eigen::MatrixXd& Xsig_aug)
 {
-
+/*
   // PREDICTION
   x_aug.fill(0.0);
   x_aug.head(5) = x_;
@@ -194,11 +203,13 @@ void UKF::GenAugSigmaPoints(Eigen::MatrixXd& Xsig_aug)
   {
     Xsig_aug.col(i+1) = x_aug + std::sqrt(lambda_ + n_aug_) * SRM_.col(i);
     Xsig_aug.col(i+1+n_aug_) = x_aug - std::sqrt(lambda_+n_aug_) * SRM_.col(i);
-  }
+  }*/
+
+
   
 }
 
-void UKF::SigmaPointsPred(Eigen::MatrixXd& Xsig_aug, double delta_t)
+void UKF::SigmaPointsPred(Eigen::MatrixXd& Xsig_aug, double time_t)
 {
   //std::cout<< Xsig_aug < 'Depois' << std::endl;
   // PREDICTION OF SIGMA POINTS
@@ -216,23 +227,23 @@ void UKF::SigmaPointsPred(Eigen::MatrixXd& Xsig_aug, double delta_t)
 
     if (std::fabs(_yawd) > 0.001)
     {
-      p_x = _x + _v / _yawd * (std::sin(_yaw + _yawd * delta_t) - std::sin(_yaw));
-      p_y = _y + _v / _yawd * (-1) * (std::cos(_yaw + _yawd * delta_t) - std::cos(_yaw));
+      p_x = _x + _v / _yawd * (std::sin(_yaw + _yawd * time_t) - std::sin(_yaw));
+      p_y = _y + _v / _yawd * (-1) * (std::cos(_yaw + _yawd * time_t) - std::cos(_yaw));
     } else {
-      p_x = _x + _v * delta_t * std::cos(_yaw);
-      p_y = _y + _v * delta_t * std::sin(_yaw);
+      p_x = _x + _v * time_t * std::cos(_yaw);
+      p_y = _y + _v * time_t * std::sin(_yaw);
     }
 
     double v_p = _v;
-    double yaw_p = _yaw + _yawd * delta_t;
+    double yaw_p = _yaw + _yawd * time_t;
     double yawd_p = _yawd;
 
-    p_x += 0.5 * _noise * delta_t * delta_t * std::cos(_yaw);
-    p_y += 0.5 * _noise * delta_t * delta_t * std::sin(_yaw);
-    v_p += _noise * delta_t;
+    p_x += 0.5 * _noise * time_t * time_t * std::cos(_yaw);
+    p_y += 0.5 * _noise * time_t * time_t * std::sin(_yaw);
+    v_p += _noise * time_t;
 
-    yaw_p += 0.5 * _noise_yaw * delta_t * delta_t; 
-    yawd_p += _noise_yaw * delta_t;
+    yaw_p += 0.5 * _noise_yaw * time_t * time_t; 
+    yawd_p += _noise_yaw * time_t;
 
     // ADDING SOME NOISE
     Xsig_pred_(0, i) = p_x;//p_x + 0.5 * _noise * delta_t * delta_t * std::cos(_yaw);
@@ -244,41 +255,94 @@ void UKF::SigmaPointsPred(Eigen::MatrixXd& Xsig_aug, double delta_t)
   }
 }
 
-void UKF::Prediction(double delta_t) {
+void UKF::Prediction(double ex_t) {
   /**
    * TODO: Complete this function! Estimate the object's location. 
    * Modify the state vector, x_. Predict sigma points, the state, 
    * and the state covariance matrix.
    */
-  GenAugSigmaPoints(Xsig_aug);
+  x_aug.fill(0.0);
+  x_aug.head(5) = x_;
+  x_aug(5) = 0;
+  x_aug(6) = 0;
 
-  SigmaPointsPred(Xsig_aug, delta_t); 
+  P_aug.fill(0.0);
+  P_aug.topLeftCorner(n_x_, n_x_) = P_;
+  P_aug(5, 5) = std_a_ * std_a_;
+  P_aug(6, 6) = std_yawdd_ * std_yawdd_;
 
-  // AJUST VALUE ON weights_
-  double weight = 0.5/(lambda_+n_aug_);
-  weights_(0) = lambda_ / (lambda_+n_aug_);
+  SRM_ = P_aug.llt().matrixL();
 
-  for (int i = 1; i < size_; ++i) {
-      weights_(i) = weight;
-  } 
+  int n = x_aug.size();
+  Xsig_aug.fill(0.0);
+  Xsig_aug.col(0) = x_aug;
 
-  // PREDICTION OF THE STATE MEAN
-  x_.fill(0.0);
+  for (int i = 0; i < n; i++)
+  {
+    Xsig_aug.col( i + 1) = x_aug + std::sqrt(lambda_ + n) * SRM_.col(i);
+    Xsig_aug.col( i + 1 + n) = x_aug - std::sqrt(lambda_ + n) * SRM_.col(i);
+  }
+
+  Xsig_pred_.fill(0.0);
+
   for (int i = 0; i < size_; i++)
   {
-    x_ += weights_(i) * Xsig_pred_.col(i);
+    double _x = Xsig_aug(0, i);
+    double _y = Xsig_aug(1, i);
+    double _v = Xsig_aug(2, i);
+    double _yaw = Xsig_aug(3, i);
+    double _yawd = Xsig_aug(4, i);
+    double _noise = Xsig_aug(5, i);
+    double _noise_yaw = Xsig_aug(6, i);
+
+    double p_x, p_y;
+
+    if (std::fabs(_yawd) > 0.001)
+    {
+      p_x = _x + _v / _yawd * (std::sin(_yaw + _yawd * ex_t) - std::sin(_yaw));
+      p_y = _y + _v / _yawd * (-1) * (std::cos(_yaw + _yawd * ex_t) - std::cos(_yaw));
+    } else {
+      p_x = _x + _v * ex_t * std::cos(_yaw);
+      p_y = _y + _v * ex_t * std::sin(_yaw);
+    }
+
+    double v_p = _v;
+    double yaw_p = _yaw + _yawd * ex_t;
+    double yawd_p = _yawd;
+
+    p_x += 0.5 * _noise * ex_t * ex_t * std::cos(_yaw);
+    p_y += 0.5 * _noise * ex_t * ex_t * std::sin(_yaw);
+    v_p += _noise * ex_t;
+
+    yaw_p += 0.5 * _noise_yaw * ex_t * ex_t; 
+    yawd_p += _noise_yaw * ex_t;
+
+    // ADDING SOME NOISE
+    Xsig_pred_(0, i) = p_x;//p_x + 0.5 * _noise * delta_t * delta_t * std::cos(_yaw);
+    Xsig_pred_(1, i) = p_y;//p_y + 0.5 * _noise * delta_t * delta_t * std::sin(_yaw); 
+    Xsig_pred_(2, i) = v_p;//_v + _noise * delta_t;
+    Xsig_pred_(3, i) = yaw_p;//_yaw + _yawd * delta_t + 0.5 * _noise_yaw * delta_t * delta_t;
+    Xsig_pred_(4, i) = yawd_p;//_yawd + _noise_yaw * delta_t;
+
+  }
+
+  // PREDICTION OF THE STATE MEAN
+  //x_.fill(0.0);
+  for (int i = 0; i < size_; i++)
+  {
+    x_ = x_ + weights_(i) * Xsig_pred_.col(i);
   }
   //PREDICTION OF STATE COVARIANCE
-  P_.fill(0.0);
+  //P_.fill(0.0);
   for (int i = 0; i < size_; i++)
   {
     Eigen::VectorXd x_diff = Xsig_pred_.col(i) - x_;
     //NORMALIZATION
     // std::cout << M_PI << std::endl;
-    std::cout << x_diff(3) << std::endl;
+    //std::cout << x_diff(3) << std::endl;
     while(x_diff(3) > M_PI) x_diff(3) -= 2.*M_PI;
     while(x_diff(3) < -M_PI) x_diff(3) += 2.*M_PI;
-    P_ += weights_(i) * x_diff * x_diff.transpose();
+    P_ = P_ + weights_(i) * x_diff * x_diff.transpose();
   }
 
 }
