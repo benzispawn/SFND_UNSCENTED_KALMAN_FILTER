@@ -5,6 +5,9 @@
 #include "Eigen/Dense"
 #include "measurement_package.h"
 
+using Eigen::MatrixXd;
+using Eigen::VectorXd;
+
 class UKF {
  public:
   /**
@@ -42,11 +45,11 @@ class UKF {
    */
   void UpdateRadar(MeasurementPackage meas_package);
 
-  void GenAugSigmaPoints(Eigen::MatrixXd& Xsig_aug);
+  void GenAugSigmaPoints(MatrixXd& Xsig_aug);
 
-  void SigmaPointsPred(Eigen::MatrixXd& Xsig_aug, double delta_t);
+  void SigmaPointsPred(MatrixXd& Xsig_aug, double delta_t);
 
-  void UpdateState(Eigen::VectorXd z, int n_z_);
+  void UpdateState(VectorXd z, int n_z_);
 
   // initially set to false, set to true in first call of ProcessMeasurement
   bool is_initialized_;
@@ -58,13 +61,13 @@ class UKF {
   bool use_radar_;
 
   // state vector: [pos1 pos2 vel_abs yaw_angle yaw_rate] in SI units and rad
-  Eigen::VectorXd x_;
+  VectorXd x_;
 
   // state covariance matrix
-  Eigen::MatrixXd P_;
+  MatrixXd P_;
 
   // predicted sigma points matrix
-  Eigen::MatrixXd Xsig_pred_;
+  MatrixXd Xsig_pred_;
 
   // time when the state is true, in us
   long long time_us_;
@@ -91,7 +94,7 @@ class UKF {
   double std_radrd_ ;
 
   // Weights of sigma points
-  Eigen::VectorXd weights_;
+  VectorXd weights_;
 
   // State dimension
   int n_x_;
@@ -105,25 +108,25 @@ class UKF {
   // Dimension size
   int size_;
 
-  Eigen::VectorXd x_aug;
-  Eigen::MatrixXd P_aug;
-  Eigen::MatrixXd Xsig_aug;
-  Eigen::MatrixXd Q_;
-  //Eigen::MatrixXd H_;
-  // Eigen::MatrixXd Tc_;
-  // Eigen::MatrixXd T_;
+  VectorXd x_aug;
+  MatrixXd P_aug;
+  MatrixXd Xsig_aug;
+  MatrixXd Q_;
+  MatrixXd H_;
+  MatrixXd Tc_;
+  MatrixXd T_;
   // SQUARE ROOT MATRIX
-  Eigen::MatrixXd SRM_;
+  MatrixXd SRM_;
   //
-  //Eigen::VectorXd x_diff;
+  //VectorXd x_diff;
   // FOR MEASUREMENTS
-  Eigen::VectorXd mea_;
-  Eigen::MatrixXd mea_sig_;//measurement for sigma points in measurement space
-  Eigen::VectorXd mean_mea_; // mean of measurement points
-  Eigen::MatrixXd mea_cov_; // covariance predicted measurement
+  VectorXd mea_;
+  MatrixXd mea_sig_;//measurement for sigma points in measurement space
+  VectorXd mean_mea_; // mean of measurement points
+  MatrixXd mea_cov_; // covariance predicted measurement
   // NOISE MATRIX
-  Eigen::MatrixXd lidar_noise_m_;
-  Eigen::MatrixXd radar_noise_m_;
+  MatrixXd lidar_noise_m_;
+  MatrixXd radar_noise_m_;
 };
 
 #endif  // UKF_H
