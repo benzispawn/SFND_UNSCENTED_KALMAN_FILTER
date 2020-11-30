@@ -45,11 +45,7 @@ class UKF {
    */
   void UpdateRadar(MeasurementPackage meas_package);
 
-  void GenAugSigmaPoints(MatrixXd& Xsig_aug);
-
-  void SigmaPointsPred(MatrixXd& Xsig_aug, double delta_t);
-
-  void UpdateState(VectorXd z, int n_z_);
+  void UpdateState(const VectorXd& z, int n_z_);
 
   // initially set to false, set to true in first call of ProcessMeasurement
   bool is_initialized_;

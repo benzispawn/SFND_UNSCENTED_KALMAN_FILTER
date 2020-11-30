@@ -149,7 +149,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       //   0, 0, 0, std_radphi_, 0,
       //   0, 0, 0, 0, std_radphi_;
     }
-    time_us_ = meas_package.timestamp_;
+    //time_us_ = meas_package.timestamp_;
     is_initialized_ = true;
     return;
   }
@@ -171,7 +171,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   }
 }
 
-void UKF::Prediction(double ex_t) {
+void UKF::Prediction(double delta_t) {
   /**
    * TODO: Complete this function! Estimate the object's location. 
    * Modify the state vector, x_. Predict sigma points, the state, 
@@ -199,7 +199,7 @@ void UKF::Prediction(double ex_t) {
   // SQUARE ROOT MATRIX
   SRM_ = P_aug.llt().matrixL();
 
-  Xsig_aug.fill(0.0);
+  //Xsig_aug.fill(0.0); ?????
   Xsig_aug.col(0) = x_aug;
 
   for (int i = 0; i < n_aug_; i++)
@@ -212,6 +212,7 @@ void UKF::Prediction(double ex_t) {
 
   for (int i = 0; i < size_; i++)
   {
+    cout << Xsig_aug << endl;
     double _x = Xsig_aug(0, i);
     double _y = Xsig_aug(1, i);
     double _v = Xsig_aug(2, i);
@@ -224,23 +225,23 @@ void UKF::Prediction(double ex_t) {
 
     if (fabs(_yawd) > 0.001)
     {
-      p_x = _x + _v / _yawd * (sin(_yaw + _yawd * ex_t) - sin(_yaw));
-      p_y = _y + _v / _yawd * (-1) * (cos(_yaw + _yawd * ex_t) - cos(_yaw));
+      p_x = _x + _v / _yawd * (sin(_yaw + _yawd * delta_t) - sin(_yaw));
+      p_y = _y + _v / _yawd * (cos(_yaw) - cos(_yaw + _yawd * delta_t) );
     } else {
-      p_x = _x + _v * ex_t * cos(_yaw);
-      p_y = _y + _v * ex_t * sin(_yaw);
+      p_x = _x + _v * delta_t * cos(_yaw);
+      p_y = _y + _v * delta_t * sin(_yaw);
     }
 
     double v_p = _v;
-    double yaw_p = _yaw + _yawd * ex_t;
+    double yaw_p = _yaw + _yawd * delta_t;
     double yawd_p = _yawd;
 
-    p_x = p_x + 0.5 * _noise * ex_t * ex_t * cos(_yaw);
-    p_y = p_x +  0.5 * _noise * ex_t * ex_t * sin(_yaw);
-    v_p = v_p + _noise * ex_t;
-    cout << "ex_t" << ex_t << endl;
-    yaw_p = yaw_p + 0.5 * _noise_yaw * ex_t * ex_t; 
-    yawd_p = yawd_p + _noise_yaw * ex_t;
+    p_x = p_x + 0.5 * _noise * delta_t * delta_t * cos(_yaw);
+    p_y = p_x +  0.5 * _noise * delta_t * delta_t * sin(_yaw);
+    v_p = v_p + _noise * delta_t;
+    cout << "delta_t" << delta_t << endl;
+    yaw_p = yaw_p + 0.5 * _noise_yaw * delta_t * delta_t; 
+    yawd_p = yawd_p + _noise_yaw * delta_t;
 
     // // ADDING SOME NOISE
     Xsig_pred_(0, i) = p_x;//p_x + 0.5 * _noise * delta_t * delta_t * cos(_yaw);
@@ -290,12 +291,13 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   // MEASUREMENT COVARIANCE MATRIX
   mea_cov_ = MatrixXd(n_z, n_z);
-
+  mea_cov_.fill(0.0);
   // SIGMA POINT IN THE MEASUREMENT SPACE
   mea_sig_ = MatrixXd(n_z, size_);
-  mea_sig_.fill(0.0);
+  //mea_sig_.fill(0.0);
   // PREDICTION MEASUREMENT
   mean_mea_ = VectorXd(n_z);
+  mean_mea_.fill(0.0);
 
   mea_ = meas_package.raw_measurements_;
   for (int i = 0; i < size_; i++)
@@ -307,21 +309,21 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
     mea_sig_(1, i) = Xsig_pred_(1, i);
   }
   //Prediction of the mean measurement
-  mean_mea_.fill(0.0);
+  
   for (int i = 0; i < size_; i++)
   {
     //mean_mea_ += H_.col(i) * weights_(i) * mea_sig_.col(i);
     mean_mea_ += weights_(i) * mea_sig_.col(i);
   }
   // Calculate covariance
-  mea_cov_.fill(0.0);
+  
   for (int i = 0; i < size_; i++)
   {
     //VectorXd mea_diff_ = H_ * mea_sig_.col(i) - mean_mea_;
     VectorXd mea_diff_ = mea_sig_.col(i) - mean_mea_;
     // ANGLE NORMALIZATION
-    while(mea_diff_(1) > M_PI) mea_diff_(1) -= 2. * M_PI;
-    while(mea_diff_(1) < -M_PI) mea_diff_(1) += 2. * M_PI; 
+    // while(mea_diff_(1) > M_PI) mea_diff_(1) -= 2. * M_PI;
+    // while(mea_diff_(1) < -M_PI) mea_diff_(1) += 2. * M_PI; 
     mea_cov_ += weights_(i) * mea_diff_ * mea_diff_.transpose();
   }
 
@@ -396,7 +398,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   UpdateState(mea_, n_z);
 }
 
-void UKF::UpdateState(const VectorXd z, int n_z_) {
+void UKF::UpdateState(const VectorXd& z, int n_z_) {
   MatrixXd Tc_ = MatrixXd(n_x_, n_z_);
 
   Tc_.fill(0.0);
@@ -405,14 +407,14 @@ void UKF::UpdateState(const VectorXd z, int n_z_) {
     // VectorXd mean_diff = H_ * mea_sig_.col(i) - mean_mea_;
     VectorXd mean_diff = mea_sig_.col(i) - mean_mea_;
 
-    while(mean_diff(1) > M_PI) mean_diff(1) -= 2.*M_PI;
-    while(mean_diff(1) < -M_PI) mean_diff(1) += 2.*M_PI;
+    // while(mean_diff(1) > M_PI) mean_diff(1) -= 2.*M_PI;
+    // while(mean_diff(1) < -M_PI) mean_diff(1) += 2.*M_PI;
     // STATE DIFFERENCE
     // VectorXd s_diff = H_ * Xsig_pred_.col(i) - x_;
     VectorXd s_diff = Xsig_pred_.col(i) - x_;
 
-    while(s_diff(3) > M_PI) s_diff(3) -= 2.*M_PI;
-    while(s_diff(3) < -M_PI) s_diff(3) += 2.*M_PI;
+    // while(s_diff(3) > M_PI) s_diff(3) -= 2.*M_PI;
+    // while(s_diff(3) < -M_PI) s_diff(3) += 2.*M_PI;
 
     Tc_ = Tc_ + weights_(i) * s_diff * mean_diff.transpose();
   }
