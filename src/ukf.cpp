@@ -257,7 +257,7 @@ void UKF::Prediction(double delta_t) {
     double yawd_p = _yawd;
 
     p_x = p_x + 0.5 * _noise * delta_t * delta_t * cos(_yaw);
-    p_y = p_x +  0.5 * _noise * delta_t * delta_t * sin(_yaw);
+    p_y = p_y +  0.5 * _noise * delta_t * delta_t * sin(_yaw);
     v_p = v_p + _noise * delta_t;
     // cout << "delta_t" << delta_t << endl;
     yaw_p = yaw_p + 0.5 * _noise_yaw * delta_t * delta_t; 
@@ -342,8 +342,8 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
     //VectorXd mea_diff_ = H_ * mea_sig_.col(i) - mean_mea_;
     VectorXd mea_diff_ = mea_sig_.col(i) - mean_mea_;
     // ANGLE NORMALIZATION
-    while(mea_diff_(1) > M_PI) mea_diff_(1) -= 2. * M_PI;
-    while(mea_diff_(1) < -M_PI) mea_diff_(1) += 2. * M_PI; 
+    // while(mea_diff_(1) > M_PI) mea_diff_(1) -= 2. * M_PI;
+    // while(mea_diff_(1) < -M_PI) mea_diff_(1) += 2. * M_PI; 
     mea_cov_ += weights_(i) * mea_diff_ * mea_diff_.transpose();
   }
 
@@ -427,14 +427,19 @@ void UKF::UpdateState(const VectorXd& z, int n_z_) {
     // VectorXd mean_diff = H_ * mea_sig_.col(i) - mean_mea_;
     VectorXd mean_diff = mea_sig_.col(i) - mean_mea_;
 
-    while(mean_diff(1) > M_PI) mean_diff(1) -= 2.*M_PI;
-    while(mean_diff(1) < -M_PI) mean_diff(1) += 2.*M_PI;
+    if (n_z_ == 3) {
+      while(mean_diff(1) > M_PI) mean_diff(1) -= 2.*M_PI;
+      while(mean_diff(1) < -M_PI) mean_diff(1) += 2.*M_PI;
+    }
     // STATE DIFFERENCE
     // VectorXd s_diff = H_ * Xsig_pred_.col(i) - x_;
     VectorXd s_diff = Xsig_pred_.col(i) - x_;
 
-    while(s_diff(3) > M_PI) s_diff(3) -= 2.*M_PI;
-    while(s_diff(3) < -M_PI) s_diff(3) += 2.*M_PI;
+    if (n_z_ == 3) {
+      while(s_diff(3) > M_PI) s_diff(3) -= 2.*M_PI;
+      while(s_diff(3) < -M_PI) s_diff(3) += 2.*M_PI;
+    }
+
 
     Tc_ = Tc_ + weights_(i) * s_diff * mean_diff.transpose();
   }
@@ -447,8 +452,10 @@ void UKF::UpdateState(const VectorXd& z, int n_z_) {
   VectorXd r_diff = z - mean_mea_;
 
   //NORMALIZATION OF THE ANGLE
-  while (r_diff(1) > M_PI) r_diff(1) -= 2.*M_PI;
-  while (r_diff(1) < -M_PI) r_diff(1) += 2.*M_PI;
+  if (n_z_ == 3) {
+    while (r_diff(1) > M_PI) r_diff(1) -= 2.*M_PI;
+    while (r_diff(1) < -M_PI) r_diff(1) += 2.*M_PI;
+  }
 
   x_ += T_ * r_diff;
   P_ -= T_ * mea_cov_ * T_.transpose();
